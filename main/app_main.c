@@ -20,11 +20,7 @@ void app_main(void)
     //     }
     // }
 
-     if (!wifi_is_connected())
-        {
-            reconnect_wifi();
-        }
-
+     
         if (wifi_is_connected())
         {
         http_get_request("example.com");

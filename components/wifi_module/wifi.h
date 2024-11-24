@@ -6,10 +6,3 @@
 #include "esp_log.h" // logi
 #include "esp_event.h" // eventy
 
-static void wifi_event_handler(void*, esp_event_base_t, int32_t, void*);
-
-void wifi_connection();
-
-void reconnect_wifi();
-
-bool wifi_is_connected();
