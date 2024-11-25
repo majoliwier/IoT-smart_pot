@@ -27,6 +27,8 @@ void app_main(void)
         printf("----------------------------------------\n");
         vTaskDelay(100);
         }
+    start_ble_services();
+
 
     mqtt_app_start();
 
