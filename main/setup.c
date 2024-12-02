@@ -8,6 +8,8 @@ void setup(){
       ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+    xTaskCreate(button_task, "button_task", 4096, NULL, 5, NULL);
+    xTaskCreate(notify_task, "notify_task", 4096, NULL, 5, NULL);
     xTaskCreate(&wifi_task, "wifi_task", 4096, NULL, 5, NULL);
 
 }

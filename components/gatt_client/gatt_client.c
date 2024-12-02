@@ -1,4 +1,4 @@
-#include "client.h"
+#include "gatt_client.h"
 
 static const char *TAG_ble_client = "BLE-Client";
 uint8_t ble_addr_type;
