@@ -12,6 +12,8 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include "sdkconfig.h"
+#include "../components/wifi_module/nvs_wifi_config.h"
+#include "esp_wifi.h"
 
 #define BOOT_BUTTON GPIO_NUM_0
 #define BOOT_HOLD_TIME 3000
@@ -26,13 +28,41 @@ void ble_app_advertise(void);
 
 static int SSID_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    printf("SSID from the client: %.*s\n", ctxt->om->om_len, ctxt->om->om_data);
+    char ssid[20] = {0};
+    memcpy(ssid, ctxt->om->om_data, ctxt->om->om_len);
+    ssid[ctxt->om->om_len] = '\0';
+    
+    printf("SSID from the client: %s\n", ssid);
+    
+    if (save_wifi_credentials(ssid, "")) {
+        ESP_LOGI(TAG_BLE_SERVER, "SSID saved successfully");
+    } else {
+        ESP_LOGE(TAG_BLE_SERVER, "Failed to save SSID");
+    }
+    
     return 0;
 }
 
 static int PASS_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    printf("Password from the client: %.*s\n", ctxt->om->om_len, ctxt->om->om_data);
+    char password[20] = {0};
+    memcpy(password, ctxt->om->om_data, ctxt->om->om_len);
+    password[ctxt->om->om_len] = '\0';
+    
+    printf("Password from the client: %s\n", password);
+    
+    char current_ssid[20] = {0};
+    if (load_wifi_credentials(current_ssid, NULL, sizeof(current_ssid))) {
+        if (save_wifi_credentials(current_ssid, password)) {
+            esp_wifi_disconnect();
+            ESP_LOGI(TAG_BLE_SERVER, "Password saved successfully, WiFi disconnected");
+        } else {
+            ESP_LOGE(TAG_BLE_SERVER, "Failed to save password");
+        }
+    } else {
+        ESP_LOGE(TAG_BLE_SERVER, "No stored SSID found");
+    }
+    
     return 0;
 }
 
@@ -122,7 +152,7 @@ void notify_task(void *param)
     {
         if (ble_enabled) {
             notify_value = !notify_value;
-            ESP_LOGI(TAG_BLE_SERVER, "Notify value: %d", notify_value);
+            // ESP_LOGI(TAG_BLE_SERVER, "Notify value: %d", notify_value);
 
             struct os_mbuf *om = ble_hs_mbuf_from_flat(&notify_value, sizeof(notify_value));
             if (om)
@@ -137,10 +167,12 @@ void notify_task(void *param)
 void host_task(void *param)
 {
     nimble_port_run();
+    vTaskDelete(NULL);
 }
 
 void ble_start(void)
 {
+    esp_log_level_set("NimBLE", ESP_LOG_NONE);
     nimble_port_init();
     ble_svc_gap_device_name_set("BLE-Server");
     ble_svc_gap_init();
@@ -155,9 +187,35 @@ void ble_start(void)
 
 void ble_stop(void)
 {
+
+    for (uint16_t conn_handle = 0; conn_handle < CONFIG_BT_NIMBLE_MAX_CONNECTIONS; conn_handle++)
+    {
+        struct ble_gap_conn_desc desc;
+        if (ble_gap_conn_find(conn_handle, &desc) == 0)
+        {
+            int rc = ble_gap_terminate(conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+            if (rc == 0)
+            {
+                ESP_LOGI(TAG_BLE_SERVER, "Disconnected client with handle %d", conn_handle);
+            }
+            else
+            {
+                ESP_LOGW(TAG_BLE_SERVER, "Failed to disconnect client with handle %d: %d", conn_handle, rc);
+            }
+        }
+    }
+
+
+
     ble_gap_adv_stop();
-    nimble_port_stop();
+
+    ble_hs_cfg.reset_cb = NULL;
+    ble_hs_cfg.sync_cb = NULL;
+
+    nimble_port_deinit();
+
     ble_enabled = false;
+
     ESP_LOGI(TAG_BLE_SERVER, "BLE stopped.");
 }
 

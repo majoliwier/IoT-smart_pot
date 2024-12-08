@@ -1,8 +1,5 @@
 #include "wifi.h"
 
-const char *ssid = "Iphoen";
-const char *pass = "12345678";
-
 #define LED_PIN GPIO_NUM_2
 
 static EventGroupHandle_t s_wifi_event_group;
@@ -43,13 +40,26 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         is_connected = false;
 
-        if (is_connected) {
-            ESP_LOGI(TAGwifi, "Rozłączono z AP, próba ponownego połączenia...");
-        } else {
-            ESP_LOGI(TAGwifi, "Nie udało się połączyć z AP, próba ponownego połączenia...");
-        }
+        wifi_config_t wifi_config = {
+            .sta = {
+                .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+            },
+        };
 
-        esp_wifi_connect();
+        char ssid[20] = {0};
+        char password[20] = {0};
+        
+        if (load_wifi_credentials(ssid, password, sizeof(ssid))) {
+            strcpy((char *)wifi_config.sta.ssid, ssid);
+            strcpy((char *)wifi_config.sta.password, password);
+
+            ESP_LOGI(TAGwifi, "Próba ponownego połączenia z siecią: %s", ssid);
+
+            esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+            esp_wifi_connect();
+        } else {
+            ESP_LOGE(TAGwifi, "Nie można wczytać danych WiFi z NVS");
+        }
 
         if (s_blink_task_handle == NULL) {
             xTaskCreate(blink_task, "blink_task", 1024, NULL, tskIDLE_PRIORITY, &s_blink_task_handle);
@@ -95,14 +105,20 @@ static void wifi_task(void *pvParameters)
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = "",
-            .password = "",
             .threshold.authmode = WIFI_AUTH_WPA2_PSK,
         },
     };
 
-    strcpy((char *)wifi_config.sta.ssid, ssid);
-    strcpy((char *)wifi_config.sta.password, pass);
+    char ssid[20] = {0};
+    char password[20] = {0};
+
+    if (load_wifi_credentials(ssid, password, sizeof(ssid))) {
+        strcpy((char *)wifi_config.sta.ssid, ssid);
+        strcpy((char *)wifi_config.sta.password, password);
+    } else {
+        strcpy((char *)wifi_config.sta.ssid, "DefaultSSID");
+        strcpy((char *)wifi_config.sta.password, "DefaultPass");
+    }
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
@@ -110,7 +126,7 @@ static void wifi_task(void *pvParameters)
 
     ESP_LOGI(TAGwifi, "ESP_WIFI_MODE_STA");
     ESP_LOGI(TAGwifi, "wifi_init_sta zakończone.");
-    ESP_LOGI(TAGwifi, "Połączenie z AP SSID:%s password:%s", ssid, pass);
+    ESP_LOGI(TAGwifi, "Połączenie z AP SSID:%s password:%s", ssid, password);
 
     vTaskDelete(NULL);
 }

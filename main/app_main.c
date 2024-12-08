@@ -34,6 +34,10 @@ void app_main(void)
 
     // mqtt_app_start();
     
+    while (1) {
+        float lux = bh1750_read();
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+    }
 
 
     

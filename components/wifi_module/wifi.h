@@ -5,4 +5,5 @@
 #include "esp_wifi.h" // wifi
 #include "esp_log.h" // logi
 #include "esp_event.h" // eventy
+#include "nvs_wifi_config.h" // wifi ssid haslo
 
