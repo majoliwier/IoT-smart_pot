@@ -68,8 +68,19 @@ static int PASS_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gat
 
 static int device_read(uint16_t con_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    char *text = "wifi pass";
-    os_mbuf_append(ctxt->om, text, strlen(text));
+
+    uint8_t mac_addr[6];
+    char mac_str[18];
+
+    esp_wifi_get_mac(WIFI_IF_STA, mac_addr);
+   
+
+    snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac_addr[0], mac_addr[1], mac_addr[2],
+             mac_addr[3], mac_addr[4], mac_addr[5]);
+
+    os_mbuf_append(ctxt->om, mac_str, strlen(mac_str));
+
     return 0;
 }
 
