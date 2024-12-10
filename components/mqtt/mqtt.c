@@ -19,7 +19,6 @@ static bool mqtt_connected = false;
 
 const char *user_id = "user123";
 
-//uzyskac adres mac za pomocą BLE #TODO
 char device_id[18];
 
 void mqtt_publish(const char *topic, const char *payload) {
@@ -36,12 +35,30 @@ void mqtt_publish_task(void *pvParameters) {
         float lux = bh1750_read();
 
         char topic[100];
-        snprintf(topic, sizeof(topic), "%s/%s/temperature", user_id, device_id);
+        snprintf(topic, sizeof(topic), "%s/%s/illuminance", user_id, device_id);
 
         char payload[100];
         snprintf(payload, sizeof(payload), "{\"illuminance\": %.2f, \"unit\": \"lx\"}", lux);
 
         mqtt_publish(topic, payload);
+
+        float temperature = 20.0;
+        char topic_temperature[100];
+        snprintf(topic_temperature, sizeof(topic_temperature), "%s/%s/temperature", user_id, device_id);
+
+        char payload_temperature[100];
+        snprintf(payload_temperature, sizeof(payload_temperature), "{\"temperature\": %.2f, \"unit\": \"C\"}", temperature);
+
+        mqtt_publish(topic_temperature, payload_temperature);
+
+        float humidity = 10;
+        char topic_humidity[100];
+        snprintf(topic_humidity, sizeof(topic_humidity), "%s/%s/humidity", user_id, device_id);
+
+        char payload_humidity[100];
+        snprintf(payload_humidity, sizeof(payload_humidity), "{\"humidity\": %.2f, \"unit\": \"%%\"}", humidity);
+
+        mqtt_publish(topic_humidity, payload_humidity);
 
         vTaskDelay(3000 / portTICK_PERIOD_MS);
     }
