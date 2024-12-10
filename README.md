@@ -1,4 +1,4 @@
-menuconfig:
-ble nimble
-partitions.csv
-4 mb flash
+menuconfig:<br>
+ble nimble <br>
+partitions.csv <br>
+4 mb flash <br>
