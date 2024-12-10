@@ -3,78 +3,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_mac.h"
-#include "../components/bh1750/bh1750.c"
-
-// static const char *TAG = "MQTT_EXAMPLE";
-
-// static esp_mqtt_client_handle_t client;
-
-
-// const char *brokerIp = "mqtt://192.168.10.169";
-
-
-// //publikacja danych (uruchamiana w osobnym zadaniu)
-// void mqtt_publish_task(void *pvParameters) {
-//     while (1) {
-//         char topic[50];
-//         char payload[50];
-//         float lux = bh1750_read();
-        
-//         snprintf(topic, sizeof(topic), "user123/device001/temperature");
-//         snprintf(payload, sizeof(payload), "{\"value\": %.2f, \"unit\": \"C\"}", temperature);
-
-//         // publikowanie danych do brokera MQTT
-//         esp_mqtt_client_publish(client, topic, payload, 0, 1, 0);
-//         ESP_LOGI(TAG, "Published: %s -> %s", topic, payload);
-
-    
-//         vTaskDelay(3000 / portTICK_PERIOD_MS);
-//     }
-// }
-
-// // obsługa zdarzeń MQTT
-// static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
-//     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
-
-//     switch (event_id) {
-//         case MQTT_EVENT_CONNECTED:
-//             ESP_LOGI(TAG, "MQTT Connected");
-//             //zadanie publikującego dane
-//             xTaskCreate(mqtt_publish_task, "mqtt_publish_task", 4096, NULL, 5, NULL);
-//             break;
-
-//         case MQTT_EVENT_DISCONNECTED:
-//             ESP_LOGI(TAG, "MQTT Disconnected");
-//             break;
-
-//         case MQTT_EVENT_ERROR:
-//             ESP_LOGE(TAG, "MQTT Error");
-//             break;
-
-//         default:
-//             ESP_LOGI(TAG, "Other MQTT event: %ld", (long int)event_id);
-//             break;
-//     }
-// }
-
-// // inicjalizacja klienta MQTT
-// void mqtt_app_start(void) {
-//     esp_mqtt_client_config_t mqtt_cfg = {
-//         .broker = {
-//             .address.uri = "mqtt://192.168.10.169",
-//         },
-        
-//     };
-
-//     // inicjalizacja
-//     client = esp_mqtt_client_init(&mqtt_cfg);
-
-//     // rejestracja zdarzeń
-//     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-
-//     // start klienta MQTT
-//     esp_mqtt_client_start(client);
-// }
+#include "../components/bh1750/bh1750.h"
+#include "../components/gatt_server/gatt_server.h"
 
 
 //mac address bluetooth
@@ -89,9 +19,8 @@ static bool mqtt_connected = false;
 
 const char *user_id = "user123";
 
-
 //uzyskac adres mac za pomocą BLE #TODO
-const char *device_id = "F0-03-8C-B7-4A-62";
+char device_id[18];
 
 void mqtt_publish(const char *topic, const char *payload) {
     if (mqtt_connected) {
@@ -110,12 +39,14 @@ void mqtt_publish_task(void *pvParameters) {
         snprintf(topic, sizeof(topic), "%s/%s/temperature", user_id, device_id);
 
         char payload[100];
-        snprintf(payload, sizeof(payload), "{\"value\": %.2f, \"unit\": \"C\"}", lux);
+        snprintf(payload, sizeof(payload), "{\"illuminance\": %.2f, \"unit\": \"lx\"}", lux);
 
         mqtt_publish(topic, payload);
 
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
     }
+        vTaskDelete(NULL);
+
 }
 
 void mqtt_message_handler(const char *topic, const char *payload) {
@@ -169,13 +100,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         }
 
         default:
-            ESP_LOGI(TAG, "Other MQTT event: %ld", (long int)event_id);
+            //ESP_LOGI(TAG, "Other MQTT event: %ld", (long int)event_id);
             break;
     }
 }
 
 // Inicjalizacja klienta MQTT
 void mqtt_app_start(void) {
+    read_device_mac(device_id, sizeof(device_id));
+    ESP_LOGI(TAG, "Device MAC: %s", device_id);
+
+    ESP_LOGI(TAG, "Device MAC: %s", device_id);
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
             // .address.uri = "mqtt://192.168.10.169",

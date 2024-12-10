@@ -1,6 +1,7 @@
 #include "app_main.h"
 
 
+
 void app_main(void)
 {
     setup();
@@ -30,14 +31,13 @@ void app_main(void)
     // start_ble_services();
 
 
-    mqtt_app_start();
-
-    // mqtt_app_start();
     
-    while (1) {
-        float lux = bh1750_read();
-        vTaskDelay(3000 / portTICK_PERIOD_MS);
-    }
+    // while (1) {
+    //     float lux = bh1750_read();
+    //     vTaskDelay(3000 / portTICK_PERIOD_MS);
+
+    // }
+    
 
 
     
