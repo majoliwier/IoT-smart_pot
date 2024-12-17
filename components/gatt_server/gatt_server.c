@@ -38,7 +38,7 @@ static int SSID_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gat
     
     printf("SSID from the client: %s\n", ssid);
     
-    if (save_wifi_credentials(ssid, "")) {
+    if (save_wifi_credentials(ssid, "default")) {
         ESP_LOGI(TAG_BLE_SERVER, "SSID saved successfully");
     } else {
         ESP_LOGE(TAG_BLE_SERVER, "Failed to save SSID");
@@ -58,7 +58,9 @@ static int PASS_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gat
     char current_ssid[20] = {0};
     if (load_wifi_credentials(current_ssid, NULL, sizeof(current_ssid))) {
         if (save_wifi_credentials(current_ssid, password)) {
-            esp_wifi_disconnect();
+            if(wifi_is_connected()){
+                esp_wifi_disconnect();
+            }
             ESP_LOGI(TAG_BLE_SERVER, "Password saved successfully, WiFi disconnected");
         } else {
             ESP_LOGE(TAG_BLE_SERVER, "Failed to save password");

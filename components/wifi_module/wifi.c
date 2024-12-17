@@ -75,7 +75,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             gpio_set_level(LED_PIN, 0);
         }
         ESP_LOGI(TAGwifi, "Uruchamianie MQTT...");
-        mqtt_app_start();
+        // mqtt_app_start();
 
     }
 }
