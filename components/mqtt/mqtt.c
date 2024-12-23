@@ -4,7 +4,9 @@
 #include "freertos/task.h"
 #include "esp_mac.h"
 #include "../components/bh1750/bh1750.h"
+#include "../components/dht11/dht11.h"
 #include "../components/gatt_server/gatt_server.h"
+#include "../components/soil_moisture/soil_moisture_sensor.h"
 
 
 //mac address bluetooth
@@ -33,6 +35,8 @@ void mqtt_publish(const char *topic, const char *payload) {
 void mqtt_publish_task(void *pvParameters) {
     while (1) {
         float lux = bh1750_read();
+        int *hum_temp = DHT11_read();
+        float moisture = soil_moisture_read();
 
         char topic[100];
         snprintf(topic, sizeof(topic), "%s/%s/illuminance", user_id, device_id);
@@ -42,7 +46,7 @@ void mqtt_publish_task(void *pvParameters) {
 
         mqtt_publish(topic, payload);
 
-        float temperature = 20.0;
+        float temperature = hum_temp[1];
         char topic_temperature[100];
         snprintf(topic_temperature, sizeof(topic_temperature), "%s/%s/temperature", user_id, device_id);
 
@@ -51,7 +55,7 @@ void mqtt_publish_task(void *pvParameters) {
 
         mqtt_publish(topic_temperature, payload_temperature);
 
-        float humidity = 10;
+        float humidity = hum_temp[0];
         char topic_humidity[100];
         snprintf(topic_humidity, sizeof(topic_humidity), "%s/%s/humidity", user_id, device_id);
 

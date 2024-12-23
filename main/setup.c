@@ -9,6 +9,8 @@ void setup(){
     }
     ESP_ERROR_CHECK(ret);
     bh1750_init();
+    DHT11_init(GPIO_NUM_4);
+    soil_moisture_init();
     xTaskCreate(button_task, "button_task", 4096, NULL, 5, NULL);
     xTaskCreate(notify_task, "notify_task", 4096, NULL, 5, NULL);
     xTaskCreate(&wifi_task, "wifi_task", 4096, NULL, 5, NULL);
