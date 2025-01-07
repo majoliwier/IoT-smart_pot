@@ -39,13 +39,13 @@ void mqtt_publish_task(void *pvParameters) {
         int *hum_temp = DHT11_read();
         float moisture = soil_moisture_read();
 
-        // char topic[100];
-        // snprintf(topic, sizeof(topic), "%s/%s/illuminance", user_id, device_id);
+        char topic[100];
+        snprintf(topic, sizeof(topic), "%s/%s/illuminance", user_id, device_id);
 
-        // char payload[100];
-        // snprintf(payload, sizeof(payload), "{\"illuminance\": %.2f, \"unit\": \"lx\"}", lux);
+        char payload[100];
+        snprintf(payload, sizeof(payload), "{\"illuminance\": %.2f, \"unit\": \"lx\"}", lux);
 
-        // mqtt_publish(topic, payload);
+        mqtt_publish(topic, payload);
 
         float temperature = hum_temp[1];
         char topic_temperature[100];
