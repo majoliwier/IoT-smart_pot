@@ -10,6 +10,9 @@ volatile bool is_connected = false;
 
 static TaskHandle_t s_blink_task_handle = NULL;
 
+bool is_mqtt_started = false;
+
+
 bool wifi_is_connected()
 {
     return is_connected;
@@ -64,6 +67,15 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         if (s_blink_task_handle == NULL) {
             xTaskCreate(blink_task, "blink_task", 1024, NULL, tskIDLE_PRIORITY, &s_blink_task_handle);
         }
+
+        if (is_mqtt_started) {
+            is_mqtt_started = false;
+            mqtt_app_stop();
+            ESP_LOGI(TAGwifi, "MQTT client stopped and destroyed successfully");
+
+        }  else {
+            ESP_LOGW(TAGwifi, "MQTT not started, skipping stop");
+        }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         is_connected = true;
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
@@ -74,8 +86,12 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             s_blink_task_handle = NULL;
             gpio_set_level(LED_PIN, 0);
         }
-        ESP_LOGI(TAGwifi, "Uruchamianie MQTT...");
-        mqtt_app_start();
+        
+        if (!is_mqtt_started) {
+            ESP_LOGI(TAGwifi, "Uruchamianie MQTT...");
+            is_mqtt_started = true;
+            mqtt_app_start();
+        }
 
     }
 }
