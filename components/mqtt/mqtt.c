@@ -33,9 +33,13 @@ void mqtt_publish(const char *topic, const char *payload) {
 }
 
 void mqtt_publish_task(void *pvParameters) {
-    
+    char topic[100];
+    snprintf(topic, sizeof(topic), "%s", user_id);
+    char payload[100];
+    snprintf(payload, sizeof(payload), "{\"device_mac\": \"%s\"}", device_id);
+    mqtt_publish(topic,payload);
     while (1) {
-        float lux = bh1750_read();
+        float lux = bh1750_read_continuous_high_res();
         int *hum_temp = DHT11_read();
         float moisture = soil_moisture_read();
 
@@ -65,7 +69,7 @@ void mqtt_publish_task(void *pvParameters) {
 
         mqtt_publish(topic_humidity, payload_humidity);
 
-        vTaskDelay(3000 / portTICK_PERIOD_MS);
+        vTaskDelay(6000 / portTICK_PERIOD_MS);
     }
         vTaskDelete(NULL);
 
