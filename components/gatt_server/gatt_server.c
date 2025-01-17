@@ -13,6 +13,7 @@
 #include "services/gatt/ble_svc_gatt.h"
 #include "sdkconfig.h"
 #include "../components/wifi_module/nvs_wifi_config.h"
+#include "../components/mqtt/nvs_email_config.h"
 #include "esp_wifi.h"
 #include "gatt_server.h"
 
@@ -72,6 +73,24 @@ static int PASS_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gat
     return 0;
 }
 
+static int EMAIL_write(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    char email[30] = {0};
+    memcpy(email, ctxt->om->om_data, ctxt->om->om_len);
+    email[ctxt->om->om_len] = '\0';
+
+    printf("Email from the client: %s\n", email);
+
+    if (save_email_address(email)) {
+        ESP_LOGI(TAG_BLE_SERVER, "Email saved successfully");
+    } else {
+        ESP_LOGE(TAG_BLE_SERVER, "Failed to save email");
+    }
+
+    return 0;
+}
+
+
 void read_device_mac(char *mac_str, size_t len) {
     uint8_t mac_addr[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac_addr);
@@ -117,6 +136,9 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
          {.uuid = BLE_UUID16_DECLARE(0xF00D),
           .flags = BLE_GATT_CHR_F_WRITE,
           .access_cb = PASS_write},
+         {.uuid = BLE_UUID16_DECLARE(0xC0DE),
+          .flags = BLE_GATT_CHR_F_WRITE,
+          .access_cb = EMAIL_write},
          {.uuid = BLE_UUID16_DECLARE(0xBEEF),
           .flags = BLE_GATT_CHR_F_NOTIFY,
           .access_cb = notify_read,

@@ -35,7 +35,7 @@ void mqtt_publish(const char *topic, const char *payload) {
 void mqtt_publish_task(void *pvParameters) {
     
     while (1) {
-        float lux = bh1750_read();
+        float lux = bh1750_read_continuous_high_res();
         int *hum_temp = DHT11_read();
         float moisture = soil_moisture_read();
 
