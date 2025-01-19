@@ -71,8 +71,8 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         if (is_mqtt_started) {
             is_mqtt_started = false;
             mqtt_app_stop();
-            ESP_LOGI(TAGwifi, "MQTT client stopped and destroyed successfully");
-
+            ESP_LOGW(TAGwifi, "MQTT client stopped and destroyed successfully");
+            
         }  else {
             ESP_LOGW(TAGwifi, "MQTT not started, skipping stop");
         }

@@ -7,7 +7,7 @@
 #include "../components/dht11/dht11.h"
 #include "../components/gatt_server/gatt_server.h"
 #include "../components/soil_moisture/soil_moisture_sensor.h"
-
+#include "../components/mqtt/nvs_email_config.h"
 
 //mac address bluetooth
 
@@ -19,9 +19,13 @@ static const char *TAG = "MQTT";
 esp_mqtt_client_handle_t client;
 bool mqtt_connected = false;
 
-const char *user_id = "user123";
+char user_id[32] = {0};
 
 char device_id[18];
+
+int illuminance_frequency = 6000;
+int humidity_frequency = 10000;
+int temperature_frequency = 20000;
 
 void mqtt_publish(const char *topic, const char *payload) {
     if (mqtt_connected) {
@@ -32,16 +36,15 @@ void mqtt_publish(const char *topic, const char *payload) {
     }
 }
 
-void mqtt_publish_task(void *pvParameters) {
-    char topic[100];
-    snprintf(topic, sizeof(topic), "%s", user_id);
-    char payload[100];
-    snprintf(payload, sizeof(payload), "{\"device_mac\": \"%s\"}", device_id);
-    mqtt_publish(topic,payload);
+void mqtt_subscribe(){
+    // zmiena czestotliwości dla temperatury, illuminance i humidity
+    
+
+}
+
+void mqtt_publish_illuminance_task(void *pvParameters) {
     while (1) {
         float lux = bh1750_read_continuous_high_res();
-        int *hum_temp = DHT11_read();
-        float moisture = soil_moisture_read();
 
         char topic[100];
         snprintf(topic, sizeof(topic), "%s/%s/illuminance", user_id, device_id);
@@ -51,27 +54,87 @@ void mqtt_publish_task(void *pvParameters) {
 
         mqtt_publish(topic, payload);
 
-        float temperature = hum_temp[1];
-        char topic_temperature[100];
-        snprintf(topic_temperature, sizeof(topic_temperature), "%s/%s/temperature", user_id, device_id);
-
-        char payload_temperature[100];
-        snprintf(payload_temperature, sizeof(payload_temperature), "{\"temperature\": %.2f, \"unit\": \"C\"}", temperature);
-
-        mqtt_publish(topic_temperature, payload_temperature);
-
-        float humidity = hum_temp[0];
-        char topic_humidity[100];
-        snprintf(topic_humidity, sizeof(topic_humidity), "%s/%s/humidity", user_id, device_id);
-
-        char payload_humidity[100];
-        snprintf(payload_humidity, sizeof(payload_humidity), "{\"humidity\": %.2f, \"unit\": \"%%\"}", humidity);
-
-        mqtt_publish(topic_humidity, payload_humidity);
-
-        vTaskDelay(6000 / portTICK_PERIOD_MS);
+        vTaskDelay(illuminance_frequency / portTICK_PERIOD_MS); // 6 sekund
     }
-        vTaskDelete(NULL);
+    vTaskDelete(NULL);
+}
+
+void mqtt_publish_temperature_task(void *pvParameters) {
+    while (1) {
+        int *hum_temp = DHT11_read();
+        float temperature = hum_temp[1];
+
+        char topic[100];
+        snprintf(topic, sizeof(topic), "%s/%s/temperature", user_id, device_id);
+
+        char payload[100];
+        snprintf(payload, sizeof(payload), "{\"temperature\": %.2f, \"unit\": \"C\"}", temperature);
+
+        mqtt_publish(topic, payload);
+
+        vTaskDelay(temperature_frequency / portTICK_PERIOD_MS); // 20 sekund
+    }
+    vTaskDelete(NULL);
+}
+
+void mqtt_publish_humidity_task(void *pvParameters) {
+    while (1) {
+        int *hum_temp = DHT11_read();
+        float humidity = hum_temp[0];
+
+        char topic[100];
+        snprintf(topic, sizeof(topic), "%s/%s/humidity", user_id, device_id);
+
+        char payload[100];
+        snprintf(payload, sizeof(payload), "{\"humidity\": %.2f, \"unit\": \"%%\"}", humidity);
+
+        mqtt_publish(topic, payload);
+
+        vTaskDelay(humidity_frequency / portTICK_PERIOD_MS); // 10 sekund
+    }
+    vTaskDelete(NULL);
+}
+
+void mqtt_publish_mac() {
+    char topic[100];
+    snprintf(topic, sizeof(topic), "%s", user_id);
+    char payload[100];
+    snprintf(payload, sizeof(payload), "{\"device_mac\": \"%s\"}", device_id);
+    mqtt_publish(topic,payload);
+    // while (1) {
+    //     float lux = bh1750_read_continuous_high_res();
+    //     int *hum_temp = DHT11_read();
+    //     float moisture = soil_moisture_read();
+
+    //     char topic[100];
+    //     snprintf(topic, sizeof(topic), "%s/%s/illuminance", user_id, device_id);
+
+    //     char payload[100];
+    //     snprintf(payload, sizeof(payload), "{\"illuminance\": %.2f, \"unit\": \"lx\"}", lux);
+
+    //     mqtt_publish(topic, payload);
+
+    //     float temperature = hum_temp[1];
+    //     char topic_temperature[100];
+    //     snprintf(topic_temperature, sizeof(topic_temperature), "%s/%s/temperature", user_id, device_id);
+
+    //     char payload_temperature[100];
+    //     snprintf(payload_temperature, sizeof(payload_temperature), "{\"temperature\": %.2f, \"unit\": \"C\"}", temperature);
+
+    //     mqtt_publish(topic_temperature, payload_temperature);
+
+    //     float humidity = hum_temp[0];
+    //     char topic_humidity[100];
+    //     snprintf(topic_humidity, sizeof(topic_humidity), "%s/%s/humidity", user_id, device_id);
+
+    //     char payload_humidity[100];
+    //     snprintf(payload_humidity, sizeof(payload_humidity), "{\"humidity\": %.2f, \"unit\": \"%%\"}", humidity);
+
+    //     mqtt_publish(topic_humidity, payload_humidity);
+
+    //     vTaskDelay(6000 / portTICK_PERIOD_MS);
+    // }
+        // vTaskDelete(NULL);
 
 }
 
@@ -79,6 +142,8 @@ void mqtt_message_handler(const char *topic, const char *payload) {
     ESP_LOGI(TAG, "Message received on topic: %s", topic);
     ESP_LOGI(TAG, "Payload: %s", payload);
 }
+
+
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t) event_data;
@@ -93,7 +158,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             esp_mqtt_client_subscribe(client, subscribe_topic, 0);
             ESP_LOGI(TAG, "Subscribed to topic: %s", subscribe_topic);
 
-            xTaskCreate(mqtt_publish_task, "mqtt_publish_task", 4096, NULL, 5, NULL);
+            //xTaskCreate(mqtt_subscribe, "mqtt_subscribe")
+            //xTaskCreate(mqtt_publish_task, "mqtt_publish_task", 4096, NULL, 5, NULL);
+            mqtt_publish_mac();
+            xTaskCreate(mqtt_publish_illuminance_task, "mqtt_publish_illuminance_task", 4096, NULL, 5, NULL);
+            xTaskCreate(mqtt_publish_temperature_task, "mqtt_publish_temperature_task", 4096, NULL, 5, NULL);
+            xTaskCreate(mqtt_publish_humidity_task, "mqtt_publish_humidity_task", 4096, NULL, 5, NULL);
             break;
 
             
@@ -138,6 +208,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 // Inicjalizacja klienta MQTT
 void mqtt_app_start(void) {
+    load_email_address(user_id, sizeof(user_id));
     read_device_mac(device_id, sizeof(device_id));
     ESP_LOGI(TAG, "Device MAC: %s", device_id);
 
@@ -163,7 +234,8 @@ void mqtt_app_start(void) {
 }
 
 void mqtt_app_stop(void){
-
+    load_email_address(user_id, sizeof(user_id));
+    printf("%s", user_id);
     if (client == NULL) {
         ESP_LOGW(TAG, "MQTT client is already destroyed");
         return;
