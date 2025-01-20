@@ -7,4 +7,4 @@
 #include "esp_event.h" // eventy
 #include "nvs_wifi_config.h" // wifi ssid haslo
 #include "../components/mqtt/mqtt.h"
-
+#include "../components/wifi_module/time_synchro.c"
