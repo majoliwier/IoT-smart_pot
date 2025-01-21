@@ -49,6 +49,7 @@ char device_id[18];
 int illuminance_frequency = 6000;
 int humidity_frequency = 10000;
 int temperature_frequency = 20000;
+int soil_moisture_frequency = 15000;
 
 // Flag to restart tasks
 volatile bool restart_tasks = false;
@@ -142,6 +143,30 @@ void mqtt_publish_humidity_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
+void mqtt_publish_soil_moisture_task(void *pvParameters) {
+    while (1) {
+        if (restart_tasks) vTaskDelete(NULL);  // Exit on restart signal
+        
+        float soil_moisture = soil_moisture_read();
+
+        char topic[100];
+        snprintf(topic, sizeof(topic), "%s/%s/soil_moisture", user_id, device_id);
+
+        char payload[200];
+        char timestamp[32];
+        get_current_time(timestamp, sizeof(timestamp));
+
+        snprintf(payload, sizeof(payload),
+                 "{\"soil_moisture\": %.2f, \"unit\": \"%%\", \"timestamp\": \"%s\"}",
+                 soil_moisture, timestamp);
+
+        mqtt_publish(topic, payload);
+
+        vTaskDelay(soil_moisture_frequency / portTICK_PERIOD_MS);
+    }
+    vTaskDelete(NULL);
+}
+
 void mqtt_publish_mac() {
     char topic[100];
     snprintf(topic, sizeof(topic), "%s", user_id);
@@ -185,12 +210,12 @@ void mqtt_publish_mac() {
 
 }
 
-// Restart tasks based on updated frequencies
 void restart_publishing_tasks() {
     restart_tasks = false;
     xTaskCreate(mqtt_publish_illuminance_task, "mqtt_publish_illuminance_task", 4096, NULL, 5, NULL);
     xTaskCreate(mqtt_publish_temperature_task, "mqtt_publish_temperature_task", 4096, NULL, 5, NULL);
     xTaskCreate(mqtt_publish_humidity_task, "mqtt_publish_humidity_task", 4096, NULL, 5, NULL);
+    xTaskCreate(mqtt_publish_soil_moisture_task, "mqtt_publish_soil_moisture_task", 4096, NULL, 5, NULL);
 }
 
 void mqtt_message_handler(const char *topic, const char *payload) {
@@ -209,6 +234,7 @@ void mqtt_message_handler(const char *topic, const char *payload) {
         cJSON *illuminance_freq = cJSON_GetObjectItem(json, "measurement_frequency_illuminance");
         cJSON *humidity_freq = cJSON_GetObjectItem(json, "measurement_frequency_humidity");
         cJSON *temperature_freq = cJSON_GetObjectItem(json, "measurement_frequency_temperature");
+        cJSON *soil_moisture_freq = cJSON_GetObjectItem(json, "measurement_frequency_soil_moisture");
 
         restart_tasks = true;  // Signal tasks to restart
         if (illuminance_freq && illuminance_freq->valueint > 0) {
@@ -222,6 +248,11 @@ void mqtt_message_handler(const char *topic, const char *payload) {
         if (temperature_freq && temperature_freq->valueint > 0) {
             temperature_frequency = temperature_freq->valueint;
             ESP_LOGI(TAG, "Updated temperature frequency: %d ms", temperature_frequency);
+        }
+
+        if(soil_moisture_freq && soil_moisture_freq->valueint >0){
+            soil_moisture_frequency = soil_moisture_freq->valueint;
+            ESP_LOGI(TAG,"Updated soil moisture frequency: %d ms", soil_moisture_frequency);
         }
 
         // restart_tasks = true;  // Signal tasks to restart
