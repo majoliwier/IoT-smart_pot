@@ -11,6 +11,26 @@
 #include <time.h>
 #include "cJSON.h"
 
+// #define bad_led_pin 12
+
+void initialize_bad_led() {
+    gpio_reset_pin(bad_led_pin);
+    gpio_set_direction(bad_led_pin, GPIO_MODE_OUTPUT);  // Ustaw jako wyjście
+}
+
+TaskHandle_t bad_blink_task_handle = NULL;
+
+void bad_blink_task(void *arg) {
+    while (1) {
+        gpio_set_level(bad_led_pin, 1);  // Włącz diodę
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        gpio_set_level(bad_led_pin, 0);  // Wyłącz diodę
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+
+
 
 //mac address bluetooth
 
@@ -214,10 +234,18 @@ void mqtt_message_handler(const char *topic, const char *payload) {
         cJSON *action = cJSON_GetObjectItem(json, "action");
         if (cJSON_IsString(action)) {
             if (strcmp(action->valuestring, "turn_on_light") == 0) {
-                // Turn on the light
+                if (bad_blink_task_handle == NULL) {
+                    xTaskCreate(bad_blink_task, "bad_blink_task", 2048, NULL, 5, &bad_blink_task_handle);
+                        ESP_LOGI(TAG, "Task created: Turning on light %s", action->valuestring);
+                }
                 ESP_LOGI(TAG, "Action: Turning on light %s", action->valuestring);
             } else {
-                ESP_LOGW(TAG, "Action: Turning on light %s", action->valuestring);
+                if (bad_blink_task_handle != NULL) {
+                    vTaskDelete(bad_blink_task_handle);
+                    bad_blink_task_handle = NULL;
+                    gpio_set_level(bad_led_pin, 0);
+                }
+                ESP_LOGW(TAG, "Action: Turning off light %s", action->valuestring);
             }
         }
         }
@@ -233,7 +261,6 @@ void mqtt_message_handler(const char *topic, const char *payload) {
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t) event_data;
-
     switch (event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT Connected");
@@ -328,6 +355,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 // Inicjalizacja klienta MQTT
 void mqtt_app_start(void) {
+    initialize_bad_led();
     load_email_address(user_id, sizeof(user_id));
     read_device_mac(device_id, sizeof(device_id));
     ESP_LOGI(TAG, "Device MAC: %s", device_id);
