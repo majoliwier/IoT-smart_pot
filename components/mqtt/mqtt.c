@@ -174,38 +174,59 @@ void restart_publishing_tasks() {
 }
 
 void mqtt_message_handler(const char *topic, const char *payload) {
-    ESP_LOGI(TAG, "Message received on topic: %s", topic);
+    ESP_LOGI(TAG, "MQTT HANDLER: Message received on topic: %s", topic);
     ESP_LOGI(TAG, "Payload: %s", payload);
 
+    
     cJSON *json = cJSON_Parse(payload);
     if (json == NULL) {
         ESP_LOGE(TAG, "Invalid JSON format");
         return;
     }
 
-    cJSON *illuminance_freq = cJSON_GetObjectItem(json, "measurement_frequency_illuminance");
-    cJSON *humidity_freq = cJSON_GetObjectItem(json, "measurement_frequency_humidity");
-    cJSON *temperature_freq = cJSON_GetObjectItem(json, "measurement_frequency_temperature");
+   if(strstr(topic, "/configuration") != NULL){
+        
+        cJSON *illuminance_freq = cJSON_GetObjectItem(json, "measurement_frequency_illuminance");
+        cJSON *humidity_freq = cJSON_GetObjectItem(json, "measurement_frequency_humidity");
+        cJSON *temperature_freq = cJSON_GetObjectItem(json, "measurement_frequency_temperature");
 
-    restart_tasks = true;  // Signal tasks to restart
-    if (illuminance_freq && illuminance_freq->valueint > 0) {
-        illuminance_frequency = illuminance_freq->valueint;
-        ESP_LOGI(TAG, "Updated illuminance frequency: %d ms", illuminance_frequency);
-    }
-    if (humidity_freq && humidity_freq->valueint > 0) {
-        humidity_frequency = humidity_freq->valueint;
-        ESP_LOGI(TAG, "Updated humidity frequency: %d ms", humidity_frequency);
-    }
-    if (temperature_freq && temperature_freq->valueint > 0) {
-        temperature_frequency = temperature_freq->valueint;
-        ESP_LOGI(TAG, "Updated temperature frequency: %d ms", temperature_frequency);
-    }
+        restart_tasks = true;  // Signal tasks to restart
+        if (illuminance_freq && illuminance_freq->valueint > 0) {
+            illuminance_frequency = illuminance_freq->valueint;
+            ESP_LOGI(TAG, "Updated illuminance frequency: %d ms", illuminance_frequency);
+        }
+        if (humidity_freq && humidity_freq->valueint > 0) {
+            humidity_frequency = humidity_freq->valueint;
+            ESP_LOGI(TAG, "Updated humidity frequency: %d ms", humidity_frequency);
+        }
+        if (temperature_freq && temperature_freq->valueint > 0) {
+            temperature_frequency = temperature_freq->valueint;
+            ESP_LOGI(TAG, "Updated temperature frequency: %d ms", temperature_frequency);
+        }
 
-    // restart_tasks = true;  // Signal tasks to restart
-    
-    cJSON_Delete(json);
-    
-    restart_tasks = false;
+        // restart_tasks = true;  // Signal tasks to restart
+        
+        cJSON_Delete(json);
+        
+        restart_tasks = false;
+    } else if (strstr(topic, "/command") != NULL) {
+        if (cJSON_IsObject(json)) {
+        cJSON *action = cJSON_GetObjectItem(json, "action");
+        if (cJSON_IsString(action)) {
+            if (strcmp(action->valuestring, "turn_on_light") == 0) {
+                // Turn on the light
+                ESP_LOGI(TAG, "Action: Turning on light %s", action->valuestring);
+            } else {
+                ESP_LOGW(TAG, "Action: Turning on light %s", action->valuestring);
+            }
+        }
+        }
+
+        cJSON_Delete(json);
+
+    } else {
+        ESP_LOGE(TAG, "MQTT ERROR SUBSCRIBTION HANDLER");
+    }
 }
 
 
@@ -222,6 +243,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             snprintf(subscribe_topic, sizeof(subscribe_topic), "%s/%s/configuration", user_id, device_id);
             esp_mqtt_client_subscribe(client, subscribe_topic, 0);
             ESP_LOGI(TAG, "Subscribed to configuration topic: %s", subscribe_topic);
+
+            char subscribe_command[100];
+            snprintf(subscribe_command, sizeof(subscribe_command),"%s/%s/command", user_id, device_id);
+            
+            
+            esp_mqtt_client_subscribe(client, subscribe_command, 0);
+            
+            ESP_LOGI(TAG, "Subscribed to command topic: %s", subscribe_command);
 
             //xTaskCreate(mqtt_subscribe, "mqtt_subscribe")
             //xTaskCreate(mqtt_publish_task, "mqtt_publish_task", 4096, NULL, 5, NULL);
@@ -254,15 +283,42 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         case MQTT_EVENT_DATA: {
             ESP_LOGI(TAG, "MQTT Event Data Received");
-            char topic[100];
-            char payload[350];
 
-            snprintf(topic, event->topic_len + 1, "%.*s", event->topic_len, event->topic);
-            snprintf(payload, event->data_len + 1, "%.*s", event->data_len, event->data);
+            // Buffers for topic and payload
+            char topic[256] = {0};
+            char payload[450] = {0};
 
+            // Validate and copy the topic
+            if (event->topic == NULL || event->topic_len == 0) {
+                ESP_LOGE(TAG, "Received message with null or empty topic");
+                return;
+            }
+
+            if (event->topic_len >= sizeof(topic)) {
+                ESP_LOGE(TAG, "Topic length exceeds buffer size");
+                return;
+            }
+
+            strncpy(topic, event->topic, event->topic_len);
+            topic[event->topic_len] = '\0';  // Null-terminate explicitly
+
+            // Validate and copy the payload
+            if (event->data_len >= sizeof(payload)) {
+                ESP_LOGE(TAG, "Payload length exceeds buffer size");
+                return;
+            }
+
+            strncpy(payload, event->data, event->data_len);
+            payload[event->data_len] = '\0';  // Null-terminate explicitly
+
+            ESP_LOGI(TAG, "Topic: %s", topic);
+            ESP_LOGI(TAG, "Payload: %s", payload);
+
+            // Pass topic and payload to the handler
             mqtt_message_handler(topic, payload);
             break;
         }
+
 
         default:
             //ESP_LOGI(TAG, "Other MQTT event: %ld", (long int)event_id);
